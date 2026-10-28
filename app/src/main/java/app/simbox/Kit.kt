@@ -27,6 +27,12 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.text.format.DateUtils
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -67,6 +73,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -131,10 +138,60 @@ fun SimboxTheme(content: @Composable () -> Unit) = MaterialTheme(
 fun Modifier.glass(r: Dp = 22.dp) = clip(RoundedCornerShape(r)).background(Glass).border(1.dp, Line, RoundedCornerShape(r))
 fun Modifier.panel() = clip(RoundedCornerShape(28.dp)).background(Panel).border(1.dp, Line, RoundedCornerShape(28.dp))
 
-// ---------- background: flat off-black (no glow bands behind pinned bars, no battery cost) ----------
+// ---------- motion ----------
 
+/** False when the user turned animations off in Android settings; everything then holds still. */
 @Composable
-fun Aurora(content: @Composable BoxScope.() -> Unit) = Box(Modifier.fillMaxSize().background(Bg), content = content)
+fun motionOn(): Boolean {
+    val ctx = LocalContext.current
+    return remember { Settings.Global.getFloat(ctx.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f }
+}
+
+private data class Sky(val a: Color, val b: Color, val c: Color)
+
+/** Dawn peach, daytime cyan, sunset coral, night indigo. */
+private fun skyAt(hour: Int) = when (hour) {
+    in 5..8 -> Sky(Color(0xFFE59A6B), Pink, Violet)
+    in 9..15 -> Sky(Cyan, Violet, Color(0xFF5B8DEF))
+    in 16..18 -> Sky(Color(0xFFE5876B), Pink, Violet)
+    else -> Sky(Violet, Color(0xFF4C5FD7), Color(0xFF2E9BB0))
+}
+
+/** Slowly drifting light behind everything; the colors follow the time of day and cross-fade when it changes. */
+@Composable
+fun Aurora(content: @Composable BoxScope.() -> Unit) {
+    val hour by produceState(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+        while (true) { delay(5 * 60_000); value = Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
+    }
+    val sky = skyAt(hour)
+    val a by animateColorAsState(sky.a, tween(4000), label = "skyA")
+    val b by animateColorAsState(sky.b, tween(4000), label = "skyB")
+    val c by animateColorAsState(sky.c, tween(4000), label = "skyC")
+    val moving = motionOn()
+    val t = rememberInfiniteTransition(label = "aurora")
+    val x by t.animateFloat(0f, 1f, infiniteRepeatable(tween(26000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "x")
+    val y by t.animateFloat(0f, 1f, infiniteRepeatable(tween(34000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "y")
+    Box(Modifier.fillMaxSize().background(Bg).drawBehind {
+        // read inside draw: the drift only redraws, it never recomposes the screen
+        val px = if (moving) x else .5f
+        val py = if (moving) y else .5f
+        fun blob(col: Color, alpha: Float, cx: Float, cy: Float, r: Float) =
+            drawCircle(Brush.radialGradient(listOf(col.copy(alpha = alpha), Color.Transparent), Offset(cx, cy), r), r, Offset(cx, cy))
+        blob(a, .20f, size.width * (.05f + .55f * px), size.height * (.02f + .10f * py), size.width * .95f)
+        blob(b, .12f, size.width * (.95f - .55f * py), size.height * (.38f + .16f * px), size.width * .85f)
+        blob(c, .14f, size.width * (.25f + .45f * py), size.height * (1.0f - .10f * px), size.width * .9f)
+    }, content = content)
+}
+
+/** Fades and lifts a list item in once, staggered by position. Only while [intro] is on, so scrolling never replays it. */
+@Composable
+fun Modifier.appear(index: Int, intro: Boolean): Modifier {
+    val p = remember { Animatable(if (intro && index < 14) 0f else 1f) }
+    LaunchedEffect(Unit) {
+        if (p.value < 1f) { delay(index * 32L); p.animateTo(1f, tween(380, easing = FastOutSlowInEasing)) }
+    }
+    return graphicsLayer { alpha = p.value; translationY = (1f - p.value) * 18.dp.toPx() }
+}
 
 // ---------- building blocks ----------
 
@@ -155,13 +212,18 @@ fun Orbit(modifier: Modifier = Modifier) {
     }
 }
 
-/** Status dot with a soft static halo; online is the only thing it needs to say. */
+/** Status dot; online ones breathe a soft halo. */
 @Composable
-fun Pulse(color: Color, on: Boolean) =
-    Box(Modifier.size(12.dp), contentAlignment = Alignment.Center) {
-        if (on) Box(Modifier.size(12.dp).background(color.copy(alpha = .22f), CircleShape))
+fun Pulse(color: Color, on: Boolean) {
+    val moving = motionOn()
+    val s by rememberInfiniteTransition(label = "pulse")
+        .animateFloat(1f, 2.2f, infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Restart), label = "s")
+    Box(Modifier.size(14.dp), contentAlignment = Alignment.Center) {
+        if (on && moving) Box(Modifier.size(7.dp).graphicsLayer { scaleX = s; scaleY = s; alpha = (2.2f - s) / 1.2f * .6f }.background(color, CircleShape))
+        else if (on) Box(Modifier.size(12.dp).background(color.copy(alpha = .22f), CircleShape))
         Box(Modifier.size(7.dp).background(if (on) color else Muted, CircleShape))
     }
+}
 
 @Composable
 private fun PressButton(text: String, modifier: Modifier, bg: Brush, fg: Color, bordered: Boolean, onClick: () -> Unit) {
@@ -381,7 +443,9 @@ fun AmountPill(amt: String) {
 fun CountBadge(n: Int, color: Color = Violet) {
     if (n <= 0) return
     Box(Modifier.height(20.dp).widthIn(min = 20.dp).clip(CircleShape).background(color).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
-        Text(if (n > 999) "999+" else n.toString(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        AnimatedContent(n, transitionSpec = { (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { -it } + fadeOut()) }, label = "badge") {
+            Text(if (it > 999) "999+" else it.toString(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

@@ -13,6 +13,12 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,6 +43,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -293,6 +300,10 @@ private fun Home(
     val pick = { f: Filter -> haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onFilter(f) }
     val archivedView = filter.kind == "archived"
 
+    var intro by remember { mutableStateOf(true) }
+    LaunchedEffect(filter, timeline, data.loaded) { intro = true; delay(900); intro = false }
+    val stuck by remember { derivedStateOf { state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "filters" }?.let { it.offset <= 0 && state.firstVisibleItemIndex > 0 } ?: false } }
+
     val nearEnd by remember { derivedStateOf { (state.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= state.layoutInfo.totalItemsCount - 8 } }
     LaunchedEffect(nearEnd, data) { if (nearEnd && data.hasMore) loadMore() }
 
@@ -305,11 +316,14 @@ private fun Home(
     var top = 0
     Column(Modifier.fillMaxSize()) {
         // fixed title bar: the list scrolls under it, the filter row pins right below it
-        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = Gutter, end = 4.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        val barBg by animateColorAsState(if (stuck) Bg else Color.Transparent, tween(220), label = "titleBar")
+        Row(Modifier.fillMaxWidth().background(barBg).statusBarsPadding().padding(start = Gutter, end = 4.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Inbox", color = Ink, fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp, lineHeight = 38.sp)
-                Text(if (data.unread > 0) "${"%,d".format(data.unread)} unread of ${"%,d".format(data.total)}" else "${"%,d".format(data.total)} messages, all read",
-                    color = Muted, fontSize = 14.sp)
+                val sub = if (data.unread > 0) "${"%,d".format(data.unread)} unread of ${"%,d".format(data.total)}" else "${"%,d".format(data.total)} messages, all read"
+                AnimatedContent(sub, transitionSpec = { (slideInVertically { it / 2 } + fadeIn()) togetherWith (slideOutVertically { -it / 2 } + fadeOut()) }, label = "sub") {
+                    Text(it, color = Muted, fontSize = 14.sp)
+                }
             }
             RoundIcon(Icons.Default.Search, "Search", onClick = onSearch)
             menu()
@@ -327,25 +341,26 @@ private fun Home(
             } }
             if (error != null) { top++; item("err") { Notice(Coral, "Offline", "New messages will arrive when the connection is back.", null) } }
             if (devices.isNotEmpty() || data.total > 0) { top++; stickyHeader("filters") {
-                FilterBar(filter, look, data, true, { simSheet = true }) { k -> pick(filter.copy(kind = if (filter.kind == k && k != "all") "all" else k)) }
+                FilterBar(filter, look, data, stuck, { simSheet = true }) { k -> pick(filter.copy(kind = if (filter.kind == k && k != "all") "all" else k)) }
             } }
 
             if (!data.loaded || (data.rows.isEmpty() && catching && devices.isNotEmpty() && filter == Filter())) items(8) { SkeletonRow() }
             else if (data.rows.isEmpty()) item("empty") { Empty(devices.isEmpty(), filter, onLink) }
 
+            var n = 0
             if (timeline) {
                 for (r in data.rows) when (r) {
                     is String -> item("h$r") { DayLabel(r) }
-                    is Msg -> item(r.id) {
-                        Box(Modifier.animateItem()) {
+                    is Msg -> { val i = n++; item(r.id) {
+                        Box(Modifier.animateItem().appear(i, intro)) {
                             Swipeable(r.read, archivedView, { Sync.later { Sync.db.setRead(r.id, !r.read) } }, { onArchiveMsg(r) }) {
                                 MsgRow(r, look, { onOpen(r.chat) }, { onMsgMenu(r) })
                             }
                         }
-                    }
+                    } }
                 }
-            } else items(data.rows.filterIsInstance<Conv>(), key = { "${it.last.dev}|${it.last.slot}|${it.last.src}" }) { c ->
-                Box(Modifier.animateItem()) {
+            } else itemsIndexed(data.rows.filterIsInstance<Conv>(), key = { _, it -> "${it.last.dev}|${it.last.slot}|${it.last.src}" }) { i, c ->
+                Box(Modifier.animateItem().appear(i, intro)) {
                     Swipeable(c.unread == 0, archivedView,
                         { Sync.later { if (c.unread > 0) Sync.db.setChatRead(c.last.chat, true) else Sync.db.setRead(c.last.id, false) } },
                         { onArchiveConv(c) }) {
@@ -462,7 +477,7 @@ private fun Notice(c: Color, title: String, sub: String, update: Pair<String, St
 /** SIM selector + message kinds, one row, pinned under the title while scrolling. */
 @Composable
 private fun FilterBar(filter: Filter, look: Look, data: Data, pinned: Boolean, onSims: () -> Unit, onKind: (String) -> Unit) =
-    Column(Modifier.fillMaxWidth().background(Bg)) {
+    Column(Modifier.fillMaxWidth().background(animateColorAsState(if (pinned) Bg else Color.Transparent, tween(220), label = "bar").value)) {
         LazyRow(Modifier.padding(vertical = 8.dp), contentPadding = PaddingValues(horizontal = Gutter), horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically) {
             item("sim") {
@@ -493,7 +508,7 @@ private fun FilterBar(filter: Filter, look: Look, data: Data, pinned: Boolean, o
                 }
             }
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Line))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(animateColorAsState(if (pinned) Line else Color.Transparent, label = "barline").value))
     }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -538,11 +553,17 @@ private fun DayLabel(text: String) =
 private fun Modifier.longClick(onClick: () -> Unit, onLong: (() -> Unit)?) = combinedClickable(onClick = onClick, onLongClick = onLong)
 
 @Composable
-private fun RowShell(onClick: () -> Unit, onLong: () -> Unit, content: @Composable () -> Unit) =
-    Column(Modifier.fillMaxWidth().background(Bg).longClick(onClick, onLong)) {
+private fun RowShell(onClick: () -> Unit, onLong: () -> Unit, content: @Composable () -> Unit) {
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val s by animateFloatAsState(if (pressed) .985f else 1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium), label = "rowPress")
+    val bg by animateColorAsState(if (pressed) Glass else Color.Transparent, label = "rowBg")
+    Column(Modifier.fillMaxWidth().graphicsLayer { scaleX = s; scaleY = s }.background(bg)
+        .combinedClickable(interactionSource = src, indication = null, onClick = onClick, onLongClick = onLong)) {
         Box(Modifier.padding(horizontal = Gutter, vertical = 11.dp)) { content() }
         Box(Modifier.padding(start = Gutter + 58.dp).fillMaxWidth().height(1.dp).background(Line))
     }
+}
 
 @Composable
 private fun Meta(text: String, c: Color, modifier: Modifier = Modifier) = Row(modifier, verticalAlignment = Alignment.CenterVertically) {
@@ -653,10 +674,10 @@ private fun Swipeable(read: Boolean, archivedView: Boolean, onToggleRead: () -> 
             SwipeToDismissBoxValue.EndToStart -> Triple(if (archivedView) Emerald else Coral, if (archivedView) "Unarchive" else "Archive", Alignment.CenterEnd)
             else -> Triple(Color.Transparent, "", Alignment.Center)
         }
-        Box(Modifier.fillMaxSize().background(c.copy(alpha = .22f)).padding(horizontal = 28.dp), contentAlignment = align) {
+        if (text.isNotEmpty()) Box(Modifier.fillMaxSize().background(c.copy(alpha = .22f)).padding(horizontal = 28.dp), contentAlignment = align) {
             Text(text, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
         }
-    }) { content() }
+    }) { Box(Modifier.background(if (state.dismissDirection != SwipeToDismissBoxValue.Settled) Bg else Color.Transparent)) { content() } }
 }
 
 @Composable
@@ -741,8 +762,8 @@ private fun SearchScreen(query: String, onQuery: (String) -> Unit, look: Look, s
             else -> LazyColumn(Modifier.fillMaxSize(), state) {
                 item { Text(if (list.size >= 200) "200+ results" else plural(list.size, "result"), Modifier.padding(start = Gutter, top = 14.dp, bottom = 4.dp),
                     color = Muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
-                items(list, key = { it.id }) { m ->
-                    SearchRow(m, query.trim(), look) { saveRecent(query); recent = recents(); keyboard?.hide(); onOpen(m.chat) }
+                itemsIndexed(list, key = { _, it -> it.id }) { i, m ->
+                    Box(Modifier.animateItem().appear(i, true)) { SearchRow(m, query.trim(), look) { saveRecent(query); recent = recents(); keyboard?.hide(); onOpen(m.chat) } }
                 }
                 item { Spacer(Modifier.navigationBarsPadding().height(24.dp)) }
             }
@@ -815,8 +836,8 @@ private fun ChatView(chat: Chat, look: Look, v: Int, onBack: () -> Unit, onMsgMe
         Box(Modifier.fillMaxWidth().height(1.dp).background(Line))
         LazyColumn(Modifier.weight(1f), reverseLayout = true, contentPadding = PaddingValues(horizontal = 16.dp)) {
             item { Spacer(Modifier.navigationBarsPadding().height(12.dp)) }
-            items(rows, key = { if (it is Msg) it.id else "d$it" }) { r ->
-                if (r is Msg) Bubble(r, c, Modifier.animateItem()) { onMsgMenu(r) }
+            itemsIndexed(rows, key = { _, it -> if (it is Msg) it.id else "d$it" }) { i, r ->
+                if (r is Msg) Bubble(r, c, Modifier.animateItem().appear(i, true)) { onMsgMenu(r) }
                 else Text(r as String, Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 8.dp), color = Muted, fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
             }
