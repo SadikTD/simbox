@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "236985234584",
+    "project_id": "simbox-6657c",
+    "storage_bucket": "simbox-6657c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:236985234584:android:c57af6e40eccb36b6e8ced",
+        "android_client_info": {
+          "package_name": "app.simbox"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCijFYoA3Xv4LGKwCFJEDZ34GEp3vd4W0k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
