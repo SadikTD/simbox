@@ -138,8 +138,9 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "simbox.db", null, 1) {
 
     fun convs(f: Filter, limit: Int): List<Conv> {
         val (w, a) = where(f)
-        // SQLite returns the bare columns from the row holding MAX(t): the latest message of each thread
-        return rows("SELECT *, MAX(t) AS mt, COUNT(*) AS n, SUM(rd=0) AS un FROM msgs WHERE $w GROUP BY dev, slot, src ORDER BY mt DESC, MAX(u) DESC LIMIT $limit", a) {
+        // SQLite returns the bare columns from the row holding MAX(t), the latest message of each thread.
+        // This only holds with exactly ONE min/max aggregate in the query; a second one (e.g. MAX(u)) makes it pick an arbitrary row.
+        return rows("SELECT *, MAX(t) AS mt, COUNT(*) AS n, SUM(rd=0) AS un FROM msgs WHERE $w GROUP BY dev, slot, src ORDER BY mt DESC LIMIT $limit", a) {
             Conv(msg(), getInt(getColumnIndexOrThrow("n")), getInt(getColumnIndexOrThrow("un")))
         }
     }

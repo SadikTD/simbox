@@ -14,8 +14,8 @@ android {
         applicationId = "app.simbox"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.3.1"
+        versionCode = 6
+        versionName = "1.3.2"
     }
     // Same key as 1.0.0, so updates install over the old version. Kept outside the repo.
     val ks = file(System.getProperty("user.home") + "/.android/simbox-release.jks")
