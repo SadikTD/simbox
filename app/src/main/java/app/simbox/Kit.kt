@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.ui.text.AnnotatedString
@@ -105,18 +106,21 @@ import kotlin.math.sin
 
 // ---------- palette ----------
 
-val Bg = Color(0xFF07080F)
-val Panel = Color(0xFF12141F)
-val Ink = Color(0xFFF4F5FA)
-val Muted = Color(0xFF9AA0B4)
-val Glass = Color(0x14FFFFFF)
-val Line = Color(0x1FFFFFFF)
-val Violet = Color(0xFF8B5CF6)
-val Cyan = Color(0xFF22D3EE)
-val Pink = Color(0xFFF472B6)
-val Amber = Color(0xFFFBBF24)
-val Emerald = Color(0xFF34D399)
-val Coral = Color(0xFFFB7185)
+// Off-black neutrals carry the screen; violet is the single accent. SIM hues are identification only (dots, avatars).
+val Bg = Color(0xFF0E0F14)
+val Panel = Color(0xFF191A22)
+val Raised = Color(0xFF20212B)
+val Ink = Color(0xFFECEDF2)
+val Soft = Color(0xFFB9BCCB)
+val Muted = Color(0xFF8B8FA3)
+val Glass = Color(0x0FFFFFFF)
+val Line = Color(0x17FFFFFF)
+val Violet = Color(0xFF8B7CF6)
+val Cyan = Color(0xFF4FC3D9)
+val Pink = Color(0xFFE57BB0)
+val Amber = Color(0xFFE0B35A)
+val Emerald = Color(0xFF4CC38A)
+val Coral = Color(0xFFE5767F)
 val SimColors = listOf(Violet, Cyan, Pink, Amber, Emerald, Coral)
 
 @Composable
@@ -127,28 +131,10 @@ fun SimboxTheme(content: @Composable () -> Unit) = MaterialTheme(
 fun Modifier.glass(r: Dp = 22.dp) = clip(RoundedCornerShape(r)).background(Glass).border(1.dp, Line, RoundedCornerShape(r))
 fun Modifier.panel() = clip(RoundedCornerShape(28.dp)).background(Panel).border(1.dp, Line, RoundedCornerShape(28.dp))
 
-// ---------- background: slow drifting aurora, palette follows the time of day ----------
+// ---------- background: flat off-black (no glow bands behind pinned bars, no battery cost) ----------
 
 @Composable
-fun Aurora(content: @Composable BoxScope.() -> Unit) {
-    val hour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
-    val (c1, c2, c3) = when (hour) {
-        in 5..10 -> Triple(Amber, Pink, Violet)
-        in 11..16 -> Triple(Cyan, Violet, Emerald)
-        in 17..20 -> Triple(Pink, Violet, Amber)
-        else -> Triple(Violet, Color(0xFF3B82F6), Pink)
-    }
-    val tr = rememberInfiniteTransition(label = "aurora")
-    val a by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(17000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "a")
-    val b by tr.animateFloat(0f, 1f, infiniteRepeatable(tween(23000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "b")
-    Box(Modifier.fillMaxSize().background(Bg).drawBehind {
-        fun blob(c: Color, x: Float, y: Float, r: Float) =
-            drawCircle(Brush.radialGradient(listOf(c.copy(alpha = .26f), Color.Transparent), Offset(x, y), r), r, Offset(x, y))
-        blob(c1, size.width * (0.1f + 0.7f * a), size.height * (0.06f + 0.1f * b), size.width * 0.95f)
-        blob(c2, size.width * (0.95f - 0.7f * b), size.height * (0.45f + 0.15f * a), size.width * 0.8f)
-        blob(c3, size.width * (0.2f + 0.5f * b), size.height * (0.98f - 0.12f * a), size.width * 0.9f)
-    }, content = content)
-}
+fun Aurora(content: @Composable BoxScope.() -> Unit) = Box(Modifier.fillMaxSize().background(Bg), content = content)
 
 // ---------- building blocks ----------
 
@@ -169,42 +155,41 @@ fun Orbit(modifier: Modifier = Modifier) {
     }
 }
 
+/** Status dot with a soft static halo; online is the only thing it needs to say. */
 @Composable
-fun Pulse(color: Color, on: Boolean) {
-    val s by rememberInfiniteTransition(label = "pulse")
-        .animateFloat(1f, 2.4f, infiniteRepeatable(tween(1500), RepeatMode.Restart), label = "s")
+fun Pulse(color: Color, on: Boolean) =
     Box(Modifier.size(12.dp), contentAlignment = Alignment.Center) {
-        if (on) Box(Modifier.size(8.dp).graphicsLayer { scaleX = s; scaleY = s; alpha = (2.4f - s) / 1.4f }.background(color, CircleShape))
-        Box(Modifier.size(8.dp).background(if (on) color else Muted, CircleShape))
+        if (on) Box(Modifier.size(12.dp).background(color.copy(alpha = .22f), CircleShape))
+        Box(Modifier.size(7.dp).background(if (on) color else Muted, CircleShape))
     }
-}
 
 @Composable
 private fun PressButton(text: String, modifier: Modifier, bg: Brush, fg: Color, bordered: Boolean, onClick: () -> Unit) {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val s by animateFloatAsState(if (pressed) .96f else 1f, spring(Spring.DampingRatioMediumBouncy), label = "press")
+    val s by animateFloatAsState(if (pressed) .97f else 1f, spring(Spring.DampingRatioMediumBouncy), label = "press")
     Box(
-        modifier.graphicsLayer { scaleX = s; scaleY = s }.clip(RoundedCornerShape(18.dp)).background(bg)
-            .then(if (bordered) Modifier.border(1.dp, Line, RoundedCornerShape(18.dp)) else Modifier)
+        modifier.graphicsLayer { scaleX = s; scaleY = s }.clip(RoundedCornerShape(14.dp)).background(bg)
+            .then(if (bordered) Modifier.border(1.dp, Line, RoundedCornerShape(14.dp)) else Modifier)
             .clickable(src, LocalIndication.current, role = Role.Button, onClick = onClick)
-            .padding(vertical = 16.dp, horizontal = 22.dp),
+            .padding(vertical = 14.dp, horizontal = 20.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, color = fg, fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+    ) { Text(text, color = fg, fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
 }
 
 @Composable
 fun GradButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) =
-    PressButton(text, modifier, Brush.linearGradient(listOf(Violet, Pink)), Color.White, false, onClick)
+    PressButton(text, modifier, SolidColor(Violet), Color.White, false, onClick)
 
 @Composable
 fun GlassButton(text: String, modifier: Modifier = Modifier, color: Color = Ink, onClick: () -> Unit) =
     PressButton(text, modifier, SolidColor(Glass), color, true, onClick)
 
+/** Plain 48dp icon button: no chrome, ripple on press. */
 @Composable
-fun RoundIcon(icon: ImageVector, desc: String, onClick: () -> Unit) =
-    Box(Modifier.size(46.dp).glass(23.dp).clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
-        Icon(icon, desc, tint = Ink)
+fun RoundIcon(icon: ImageVector, desc: String, tint: Color = Ink, onClick: () -> Unit) =
+    Box(Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onClick), contentAlignment = Alignment.Center) {
+        Icon(icon, desc, tint = tint)
     }
 
 @Composable
@@ -218,12 +203,16 @@ fun Field(value: String, onChange: (String) -> Unit, modifier: Modifier = Modifi
             }
         })
 
+/** Tinted circle: the SIM hue at low strength with the initial in full hue. Phone numbers get a person glyph. */
 @Composable
-fun Avatar(from: String, c: Color, size: Dp = 46.dp) =
-    Box(Modifier.size(size).background(Brush.linearGradient(listOf(c, c.copy(alpha = .45f))), CircleShape), contentAlignment = Alignment.Center) {
-        Text(from.firstOrNull { it.isLetter() }?.uppercase() ?: "#", color = Bg, fontWeight = FontWeight.Black, fontSize = (size.value * .38f).sp)
+fun Avatar(from: String, c: Color, size: Dp = 44.dp) =
+    Box(Modifier.size(size).background(c.copy(alpha = .16f), CircleShape), contentAlignment = Alignment.Center) {
+        val letter = from.firstOrNull { it.isLetter() }
+        if (letter == null) Icon(androidx.compose.material.icons.Icons.Default.Person, null, Modifier.size(size * .5f), tint = c)
+        else Text(letter.uppercase(), color = c, fontWeight = FontWeight.SemiBold, fontSize = (size.value * .4f).sp)
     }
 
+/** One-time code with tap-to-copy. Compact so it sits inside a list row. */
 @Composable
 fun OtpPill(code: String, c: Color) {
     val ctx = LocalContext.current
@@ -231,17 +220,17 @@ fun OtpPill(code: String, c: Color) {
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) { if (copied) { delay(1600); copied = false } }
     Row(
-        Modifier.clip(CircleShape).background(c.copy(alpha = .18f)).border(1.dp, c.copy(alpha = .45f), CircleShape)
-            .clickable(role = Role.Button) {
+        Modifier.clip(RoundedCornerShape(8.dp)).background(Violet.copy(alpha = .14f))
+            .clickable(role = Role.Button, onClickLabel = "Copy code") {
                 ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("code", code))
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 copied = true
-            }.padding(horizontal = 12.dp, vertical = 6.dp),
+            }.padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(code, color = Ink, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp, fontSize = 14.sp)
+        Text(code, color = Ink, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp, fontSize = 13.sp)
         Spacer(Modifier.width(8.dp))
-        AnimatedContent(copied, label = "copy") { Text(if (it) "Copied" else "Copy", color = c, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+        AnimatedContent(copied, label = "copy") { Text(if (it) "Copied" else "Copy", color = Violet, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
     }
 }
 

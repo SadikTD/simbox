@@ -64,10 +64,10 @@ fun shortTime(t: Long): String {
 
 @Composable
 private fun TopBar(title: String, onBack: () -> Unit) =
-    Row(Modifier.fillMaxWidth().statusBarsPadding().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        RoundIcon(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
+    Row(Modifier.fillMaxWidth().statusBarsPadding().padding(top = 8.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        RoundIcon(Icons.AutoMirrored.Filled.ArrowBack, "Back", onClick = onBack)
         Spacer(Modifier.width(14.dp))
-        Text(title, color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Black)
+        Text(title, color = Ink, fontSize = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
     }
 
 @Composable

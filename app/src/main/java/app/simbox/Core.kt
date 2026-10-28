@@ -78,7 +78,10 @@ object Store {
     var key: String? get() = get("key"); set(v) = set("key", v)
     var role: String? get() = get("role"); set(v) = set("role", v)
     var name: String get() = get("name") ?: Build.MODEL; set(v) = set("name", v.trim().ifBlank { Build.MODEL })
-    val deviceId: String get() = get("id") ?: UUID.randomUUID().toString().replace("-", "").take(12).also { set("id", it) }
+    // synchronized: the backfill worker and heartbeat can ask at the same moment on a fresh install
+    val deviceId: String get() = synchronized(this) {
+        get("id") ?: UUID.randomUUID().toString().replace("-", "").take(12).also { p.edit().putString("id", it).commit() }
+    }
 
     var lastNotified: Long get() = long("ln"); set(v) = putLong("ln", v)
     var lastUpload: Long get() = long("lu"); set(v) = putLong("lu", v)
