@@ -1,5 +1,22 @@
 package app.simbox
 
+import android.content.ComponentName
+import android.os.Build
+import android.widget.Toast
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -286,4 +303,144 @@ fun dayLabel(t: Long): String = when {
     DateUtils.isToday(t) -> "Today"
     DateUtils.isToday(t + DateUtils.DAY_IN_MILLIS) -> "Yesterday"
     else -> SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(Date(t))
+}
+
+
+// ---------- more building blocks ----------
+
+@Composable
+fun Shimmer(modifier: Modifier = Modifier) {
+    val x by rememberInfiniteTransition(label = "shimmer")
+        .animateFloat(-1f, 2f, infiniteRepeatable(tween(1300, easing = LinearEasing)), label = "x")
+    Box(modifier.drawBehind {
+        drawRect(Brush.linearGradient(listOf(Glass, Color(0x26FFFFFF), Glass),
+            start = Offset(size.width * x - size.width * .5f, 0f), end = Offset(size.width * x + size.width * .5f, size.height)))
+    })
+}
+
+@Composable
+fun ShimmerCard() = Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).glass(22.dp).padding(14.dp)) {
+    Shimmer(Modifier.size(46.dp).clip(CircleShape))
+    Spacer(Modifier.width(12.dp))
+    Column(Modifier.weight(1f)) {
+        Shimmer(Modifier.fillMaxWidth(.45f).height(14.dp).clip(CircleShape))
+        Spacer(Modifier.height(10.dp))
+        Shimmer(Modifier.fillMaxWidth().height(11.dp).clip(CircleShape))
+        Spacer(Modifier.height(6.dp))
+        Shimmer(Modifier.fillMaxWidth(.7f).height(11.dp).clip(CircleShape))
+    }
+}
+
+@Composable
+fun SectionTitle(text: String) =
+    Text(text.uppercase(), Modifier.padding(start = 6.dp, top = 22.dp, bottom = 8.dp), color = Muted, fontSize = 12.sp,
+        fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+
+@Composable
+fun Card(content: @Composable ColumnScope.() -> Unit) =
+    Column(Modifier.fillMaxWidth().glass(20.dp), content = content)
+
+@Composable
+fun ToggleRow(title: String, sub: String, checked: Boolean, onChange: (Boolean) -> Unit) =
+    Row(Modifier.fillMaxWidth().clickable(role = Role.Switch) { onChange(!checked) }.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(sub, color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(checked, onChange, colors = SwitchDefaults.colors(
+            checkedTrackColor = Violet, checkedThumbColor = Color.White, uncheckedTrackColor = Glass, uncheckedBorderColor = Line, uncheckedThumbColor = Muted))
+    }
+
+@Composable
+fun NavRow(title: String, sub: String? = null, color: Color = Ink, onClick: () -> Unit) =
+    Row(Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = color, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            if (sub != null) Text(sub, color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Muted)
+    }
+
+@Composable
+fun Divider() = Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(1.dp).background(Line))
+
+@Composable
+fun Segmented(options: List<String>, selected: Int, modifier: Modifier = Modifier, onSelect: (Int) -> Unit) =
+    Row(modifier.clip(CircleShape).background(Glass).border(1.dp, Line, CircleShape).padding(4.dp)) {
+        options.forEachIndexed { i, o ->
+            val bg by animateColorAsState(if (i == selected) Ink else Color.Transparent, label = "seg")
+            val fg by animateColorAsState(if (i == selected) Bg else Muted, label = "segfg")
+            Box(Modifier.weight(1f).clip(CircleShape).background(bg).clickable(role = Role.Tab) { onSelect(i) }.padding(vertical = 9.dp),
+                contentAlignment = Alignment.Center) { Text(o, color = fg, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1) }
+        }
+    }
+
+@Composable
+fun SheetRow(text: String, color: Color = Ink, onClick: () -> Unit) =
+    Text(text, Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onClick).padding(horizontal = 24.dp, vertical = 15.dp),
+        color = color, fontSize = 16.sp)
+
+@Composable
+fun AmountPill(amt: String) {
+    val c = when { amt.startsWith("+") -> Emerald; amt.startsWith("-") -> Coral; else -> Amber }
+    Text(amt, Modifier.clip(CircleShape).background(c.copy(alpha = .16f)).padding(horizontal = 10.dp, vertical = 5.dp),
+        color = c, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+}
+
+@Composable
+fun CountBadge(n: Int, color: Color = Violet) {
+    if (n <= 0) return
+    Box(Modifier.height(20.dp).widthIn(min = 20.dp).clip(CircleShape).background(color).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
+        Text(if (n > 999) "999+" else n.toString(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+private val linkRx = Regex("(https?://\\S+|www\\.\\S+)|(\\*\\d[\\d*]*#)|(\\+?\\d[\\d -]{8,}\\d)")
+
+/** Message text with tappable links, USSD codes and phone numbers. */
+fun linkified(text: String, color: Color): AnnotatedString = buildAnnotatedString {
+    var last = 0
+    for (m in linkRx.findAll(text)) {
+        append(text.substring(last, m.range.first))
+        val v = m.value.trimEnd('.', ',', ')')
+        val url = if (m.groups[1] != null) (if (v.startsWith("www")) "https://$v" else v)
+            else "tel:" + Uri.encode(v.filter { it.isDigit() || it in "+*#" })
+        withLink(LinkAnnotation.Url(url, TextLinkStyles(SpanStyle(color = color, textDecoration = TextDecoration.Underline)))) { append(v) }
+        append(m.value.substring(v.length))
+        last = m.range.last + 1
+    }
+    append(text.substring(last))
+}
+
+fun copyText(ctx: Context, text: String, label: String = "Copied") {
+    ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("text", text))
+    if (Build.VERSION.SDK_INT < 33) Toast.makeText(ctx, label, Toast.LENGTH_SHORT).show()
+}
+
+fun shareText(ctx: Context, text: String) =
+    ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null))
+
+fun openUrl(ctx: Context, url: String) = runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+
+private val oem = Build.MANUFACTURER.lowercase()
+val needsAutostart = listOf("xiaomi", "redmi", "poco", "oppo", "realme", "oneplus", "vivo", "iqoo", "samsung", "huawei", "honor").any { it in oem }
+val isXiaomi = listOf("xiaomi", "redmi", "poco").any { it in oem }
+
+/** Opens the phone maker's autostart / background manager, falling back to App info. */
+fun openAutostart(ctx: Context) {
+    val targets = listOf(
+        "com.miui.securitycenter" to "com.miui.permcenter.autostart.AutoStartManagementActivity",
+        "com.coloros.safecenter" to "com.coloros.safecenter.permission.startup.StartupAppListActivity",
+        "com.coloros.safecenter" to "com.coloros.safecenter.startupapp.StartupAppListActivity",
+        "com.oplus.safecenter" to "com.oplus.safecenter.permission.startup.StartupAppListActivity",
+        "com.vivo.permissionmanager" to "com.vivo.permissionmanager.activity.BgStartUpManagerActivity",
+        "com.iqoo.secure" to "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity",
+        "com.huawei.systemmanager" to "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity",
+        "com.samsung.android.lool" to "com.samsung.android.sm.battery.ui.BatteryActivity",
+    )
+    for ((pkg, cls) in targets) {
+        if (runCatching { ctx.startActivity(Intent().setComponent(ComponentName(pkg, cls)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) return
+    }
+    appSettings(ctx)
 }

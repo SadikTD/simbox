@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp" android:background="@drawable/widget_bg">
+    <TextView android:id="@+id/title" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Latest codes" android:textColor="#9AA0B4" android:textSize="12sp" android:textStyle="bold" android:letterSpacing="0.08" />
+    <TextView android:id="@+id/empty" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingTop="10dp" android:text="New one-time codes will show here. Tap one to copy it."
+        android:textColor="#F4F5FA" android:textSize="13sp" />
+    <LinearLayout android:id="@+id/row1" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="10dp">
+        <TextView android:id="@+id/code1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#F4F5FA" android:textSize="22sp" android:textStyle="bold" android:fontFamily="monospace" android:letterSpacing="0.1" />
+        <TextView android:id="@+id/from1" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:layout_marginStart="12dp" android:textColor="#9AA0B4" android:textSize="12sp" android:singleLine="true" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/row2" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="8dp">
+        <TextView android:id="@+id/code2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#C9CCDA" android:textSize="18sp" android:textStyle="bold" android:fontFamily="monospace" android:letterSpacing="0.1" />
+        <TextView android:id="@+id/from2" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:layout_marginStart="12dp" android:textColor="#9AA0B4" android:textSize="12sp" android:singleLine="true" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/row3" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="8dp">
+        <TextView android:id="@+id/code3" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#C9CCDA" android:textSize="18sp" android:textStyle="bold" android:fontFamily="monospace" android:letterSpacing="0.1" />
+        <TextView android:id="@+id/from3" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:layout_marginStart="12dp" android:textColor="#9AA0B4" android:textSize="12sp" android:singleLine="true" android:ellipsize="end" />
+    </LinearLayout>
+</LinearLayout>

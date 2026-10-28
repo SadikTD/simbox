@@ -14,10 +14,26 @@ android {
         applicationId = "app.simbox"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
-    buildFeatures { compose = true }
+    // Same key as 1.0.0, so updates install over the old version. Kept outside the repo.
+    val ks = file(System.getProperty("user.home") + "/.android/simbox-release.jks")
+    signingConfigs {
+        create("release") {
+            storeFile = if (ks.exists()) ks else file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"; keyAlias = "androiddebugkey"; keyPassword = "android"
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+    buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

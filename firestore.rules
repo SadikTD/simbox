@@ -2,9 +2,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Room ids are random 24-char secrets shared only through the pairing QR.
-    // Message contents are AES-GCM encrypted on the phone before upload.
+    // Message contents, phone info and contacts are AES-GCM encrypted on the phone before upload.
     match /rooms/{room}/{coll}/{id} {
-      allow read, write: if room.size() >= 20 && coll in ['msgs', 'devices'];
+      allow read, write: if room.size() >= 20 && coll in ['msgs', 'devices', 'contacts'];
     }
   }
 }
