@@ -429,7 +429,7 @@ class ActionReceiver : BroadcastReceiver() {
         when (intent.action) {
             COPY -> {
                 val code = intent.getStringExtra("code") ?: return
-                ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("code", code))
+                setClip(ctx, code)
                 Toast.makeText(ctx, "Code $code copied", Toast.LENGTH_SHORT).show()
                 Sync.init(ctx); Sync.later { Sync.db.setRead(id, true) }
             }

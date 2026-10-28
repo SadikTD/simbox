@@ -339,7 +339,10 @@ private fun Home(
                     LinearProgressIndicator(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape), color = Violet, trackColor = Glass)
                 }
             } }
-            if (error != null) { top++; item("err") { Notice(Coral, "Offline", "New messages will arrive when the connection is back.", null) } }
+            if (error != null) { top++; item("err") {
+                if (error!!.contains("PERMISSION_DENIED")) Notice(Coral, "This cloud is private", "This Simbox backend only serves its owner's phones. To use Simbox yourself, connect it to your own Firebase project (see the README on GitHub).", null)
+                else Notice(Coral, "Offline", "New messages will arrive when the connection is back.", null)
+            } }
             if (devices.isNotEmpty() || data.total > 0) { top++; stickyHeader("filters") {
                 FilterBar(filter, look, data, stuck, { simSheet = true }) { k -> pick(filter.copy(kind = if (filter.kind == k && k != "all") "all" else k)) }
             } }

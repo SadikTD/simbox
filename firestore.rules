@@ -1,10 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Room ids are random 24-char secrets shared only through the pairing QR.
-    // Message contents, phone info and contacts are AES-GCM encrypted on the phone before upload.
+    // Only rooms listed here can use this backend. Copies of the public app that pair
+    // to a new code are refused, so nobody else can use up the free quota.
+    // The deployed rules list the owner's real room id; it is not published here.
+    // Contents are AES-256-GCM encrypted on the phones; the key never reaches Firebase.
+    function allowedRoom(room) {
+      return room in ['YOUR_ROOM_ID'];
+    }
     match /rooms/{room}/{coll}/{id} {
-      allow read, write: if room.size() >= 20 && coll in ['msgs', 'devices', 'contacts'];
+      allow read, write: if allowedRoom(room) && coll in ['msgs', 'devices', 'contacts'];
     }
   }
 }

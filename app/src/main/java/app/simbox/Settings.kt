@@ -92,10 +92,16 @@ fun SettingsScreen(onBack: () -> Unit, onPhones: () -> Unit, onLink: () -> Unit,
 
         SectionTitle("Privacy & security")
         Card {
+            // both turning it on and off need a successful check, so the toggle only flips after the prompt passes
+            var wanted by remember { mutableStateOf(false) }
+            val auth = rememberAuth {
+                Store.appLock = wanted; tick++
+                Toast.makeText(ctx, if (wanted) "App lock is on" else "App lock is off", Toast.LENGTH_SHORT).show()
+            }
             ToggleRow("App lock", "Ask for your fingerprint or screen lock when opening Simbox", remember(tick) { Store.appLock }) { on ->
                 if (on && !ctx.getSystemService(KeyguardManager::class.java).isDeviceSecure)
                     Toast.makeText(ctx, "Set a screen lock on this phone first", Toast.LENGTH_LONG).show()
-                else { Store.appLock = on; tick++ }
+                else { wanted = on; auth(if (on) "Turn on App lock" else "Turn off App lock") }
             }
             Divider()
             ToggleRow("Hide messages on lock screen", "Notifications only say which SIM got a message until you unlock", remember(tick) { Store.hideOnLock }) {
@@ -140,7 +146,7 @@ fun SettingsScreen(onBack: () -> Unit, onPhones: () -> Unit, onLink: () -> Unit,
         SectionTitle("Danger zone")
         Card {
             NavRow(if (resetConfirm) "Tap again to reset pairing" else "Reset pairing",
-                "Makes a new pairing code. Every other phone stops sending until you link it again.", Coral) {
+                "Makes a new pairing code. Every other phone stops sending until you link it again, and the new code must be added to the Firebase rules first.", Coral) {
                 if (!resetConfirm) { resetConfirm = true; return@NavRow }
                 Sync.io.execute { devices.keys.forEach { runCatching { devsRef().document(it).set(mapOf("removed" to true), SetOptions.merge()) } } }
                 Sync.stop(); Store.create(); Store.syncCursor = System.currentTimeMillis(); Store.set("known", null)

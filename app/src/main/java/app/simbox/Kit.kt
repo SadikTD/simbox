@@ -284,7 +284,7 @@ fun OtpPill(code: String, c: Color) {
     Row(
         Modifier.clip(RoundedCornerShape(8.dp)).background(Violet.copy(alpha = .14f))
             .clickable(role = Role.Button, onClickLabel = "Copy code") {
-                ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("code", code))
+                setClip(ctx, code)
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 copied = true
             }.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -467,7 +467,7 @@ fun linkified(text: String, color: Color): AnnotatedString = buildAnnotatedStrin
 }
 
 fun copyText(ctx: Context, text: String, label: String = "Copied") {
-    ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("text", text))
+    setClip(ctx, text)
     if (Build.VERSION.SDK_INT < 33) Toast.makeText(ctx, label, Toast.LENGTH_SHORT).show()
 }
 
@@ -496,4 +496,13 @@ fun openAutostart(ctx: Context) {
         if (runCatching { ctx.startActivity(Intent().setComponent(ComponentName(pkg, cls)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) return
     }
     appSettings(ctx)
+}
+
+/** Copies text marked as sensitive, so Android 13+ hides it in the clipboard preview and keyboard suggestions. */
+fun setClip(ctx: Context, text: String) {
+    val clip = ClipData.newPlainText("Simbox", text)
+    if (Build.VERSION.SDK_INT >= 33) clip.description.extras = android.os.PersistableBundle().apply {
+        putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+    }
+    ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip)
 }

@@ -60,6 +60,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -109,32 +110,59 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() { super.onStop(); stoppedAt = System.currentTimeMillis() }
-    override fun onResume() { super.onResume(); ResumeTick.intValue++ }
+    override fun onResume() {
+        super.onResume()
+        ResumeTick.intValue++
+        // with App Lock on, the recent-apps preview is blank so messages don't show there either
+        if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!Store.appLock)
+    }
 }
 
 // ---------- app lock ----------
 
-private fun authenticate(act: ComponentActivity, legacy: () -> Unit, onOk: () -> Unit) {
-    if (Build.VERSION.SDK_INT >= 28) {
-        val b = BiometricPrompt.Builder(act).setTitle("Unlock Simbox").setSubtitle("Your messages are protected")
+/**
+ * Fingerprint/face, or the phone's PIN/pattern. Never throws: if the biometric prompt can't run on this phone,
+ * it falls back to the system screen-lock check ([fallback]).
+ */
+private fun authenticate(act: ComponentActivity, title: String, fallback: () -> Unit, onOk: () -> Unit) {
+    if (Build.VERSION.SDK_INT < 28) { fallback(); return }
+    runCatching {
+        val b = BiometricPrompt.Builder(act).setTitle(title).setSubtitle("Use your fingerprint, face or screen lock")
         if (Build.VERSION.SDK_INT >= 30) b.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
         else @Suppress("DEPRECATION") b.setDeviceCredentialAllowed(true)
         b.build().authenticate(CancellationSignal(), act.mainExecutor, object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) = onOk()
+            override fun onAuthenticationError(code: Int, msg: CharSequence?) {
+                if (code == BiometricPrompt.BIOMETRIC_ERROR_HW_NOT_PRESENT || code == BiometricPrompt.BIOMETRIC_ERROR_HW_UNAVAILABLE ||
+                    code == BiometricPrompt.BIOMETRIC_ERROR_NO_BIOMETRICS) fallback()
+            }
         })
-    } else legacy()
+    }.onFailure { fallback() }
+}
+
+/** Returns a function that asks the user to prove it's them, then runs [onOk]. Works on every Android version Simbox supports. */
+@Composable
+fun rememberAuth(onOk: () -> Unit): (String) -> Unit {
+    val act = LocalContext.current as ComponentActivity
+    val ok by rememberUpdatedState(onOk)
+    val legacy = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (it.resultCode == android.app.Activity.RESULT_OK) ok()
+    }
+    return remember {
+        { title: String ->
+            authenticate(act, title, {
+                @Suppress("DEPRECATION")
+                val i = act.getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent(title, null)
+                if (i == null) ok() else legacy.launch(i)
+            }) { ok() }
+        }
+    }
 }
 
 @Composable
 private fun LockScreen() {
-    val act = LocalContext.current as ComponentActivity
-    val legacy = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { if (it.resultCode == android.app.Activity.RESULT_OK) Locked.value = false }
-    val unlock = {
-        authenticate(act, {
-            val i = act.getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent("Unlock Simbox", null)
-            if (i == null) Locked.value = false else legacy.launch(i)
-        }) { Locked.value = false }
-    }
+    val auth = rememberAuth { Locked.value = false }
+    val unlock = { auth("Unlock Simbox") }
     LaunchedEffect(Unit) { unlock() }
     Column(Modifier.fillMaxSize().systemBarsPadding().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Orbit()
